@@ -1,6 +1,12 @@
 package intmap
 
-import "testing"
+import (
+	"maps"
+	"math/rand"
+	"slices"
+	"testing"
+	"unsafe"
+)
 
 func TestSet(t *testing.T) {
 	s := NewSet[int](0)
@@ -146,4 +152,79 @@ func TestSetIter(t *testing.T) {
 	if sum != sumTo99 {
 		t.Fatalf("unexpected sum: %d, want %d", sum, sumTo99)
 	}
+}
+
+func TestSetMemory(t *testing.T) {
+	if sz := unsafe.Sizeof(pair[int8, struct{}]{}); sz != unsafe.Sizeof(int8(0)) {
+		t.Fatalf("unsafe size of pair[int32, struct{}] must be 1: %d", sz)
+	}
+	if sz := unsafe.Sizeof(pair[int16, struct{}]{}); sz != unsafe.Sizeof(int16(0)) {
+		t.Fatalf("unsafe size of pair[int32, struct{}] must be 2: %d", sz)
+	}
+	if sz := unsafe.Sizeof(pair[int32, struct{}]{}); sz != unsafe.Sizeof(int32(0)) {
+		t.Fatalf("unsafe size of pair[int32, struct{}] must be 4: %d", sz)
+	}
+	if sz := unsafe.Sizeof(pair[int64, struct{}]{}); sz != unsafe.Sizeof(int64(0)) {
+		t.Fatalf("unsafe size of pair[int64, struct{}] must be 8: %d", sz)
+	}
+}
+
+func BenchmarkSetAdd10K(b *testing.B) {
+	rr := rand.New(rand.NewSource(12345))
+	seen := make(map[int]struct{}, 10_000)
+	for len(seen) < 10_000 {
+		seen[int(rr.Int31())] = struct{}{}
+	}
+	keys := slices.AppendSeq(make([]int, 0, 10_000), maps.Keys(seen))
+	b.ResetTimer()
+
+	for range b.N {
+		s := NewSet[int](10_000)
+		for _, k := range keys {
+			s.Add(k)
+		}
+	}
+}
+
+func BenchmarkSetHas10K(b *testing.B) {
+	rr := rand.New(rand.NewSource(12345))
+	hitKeys := make([]int, 10_000)
+	s := NewSet[int](len(hitKeys))
+	for i := range hitKeys {
+		k := rr.Int()
+		hitKeys[i] = k
+		s.Add(k)
+	}
+	missKeys := make([]int, 0, 10_000)
+	for len(missKeys) < len(hitKeys) {
+		k := rr.Int()
+		if !s.Has(k) {
+			missKeys = append(missKeys, k)
+		}
+	}
+
+	b.Run("all_miss", func(b *testing.B) {
+		for range b.N {
+			for _, k := range missKeys {
+				_ = s.Has(k)
+			}
+		}
+	})
+
+	b.Run("all_hit", func(b *testing.B) {
+		for range b.N {
+			for _, k := range hitKeys {
+				_ = s.Has(k)
+			}
+		}
+	})
+
+	b.Run("mixed_hit", func(b *testing.B) {
+		for range b.N {
+			for i := range hitKeys {
+				_ = s.Has(hitKeys[i])
+				_ = s.Has(missKeys[i])
+			}
+		}
+	})
 }

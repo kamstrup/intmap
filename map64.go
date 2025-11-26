@@ -11,9 +11,16 @@ type IntKey interface {
 	~int | ~uint | ~int64 | ~uint64 | ~int32 | ~uint32 | ~int16 | ~uint16 | ~int8 | ~uint8 | ~uintptr
 }
 
+// pair represents a key-value pair in Map.
+//
+// It is an important detail that V is before K in the memory layout. Despite it feeling more natural to have K first!
+// We must have sizeof(pair[K,struct{}]) == sizeof(K), to minimize memory consumption when using a Set.
+// If V is last, then &p.V can point to invalid memory, which is not permitted. This makes the Go compiler emit
+// some padding for the pair struct in that case.
+// See https://github.com/kamstrup/intmap/pull/6#issuecomment-3581008879
 type pair[K IntKey, V any] struct {
-	K K
 	V V
+	K K
 }
 
 const fillFactor64 = 0.7
