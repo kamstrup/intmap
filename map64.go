@@ -23,7 +23,8 @@ type pair[K IntKey, V any] struct {
 	K K
 }
 
-const fillFactor64 = 0.7
+const fillFactorBase64 = 7
+const fillFactor64 = fillFactorBase64 / 10.0
 
 func phiMix64(x int) int {
 	h := int64(x) * int64(0x9E3779B9)
@@ -331,15 +332,15 @@ func (m *Map[K, V]) Len() int {
 }
 
 func (m *Map[K, V]) sizeThreshold() int {
-	return int(math.Floor(float64(len(m.data)) * fillFactor64))
+	return int(uint64(len(m.data)) * fillFactorBase64 / 10)
 }
 
 func (m *Map[K, V]) startIndex(key K) int {
-	return phiMix64(int(key)) & (len(m.data) - 1)
+	return startIndex(int(key), len(m.data))
 }
 
 func (m *Map[K, V]) nextIndex(idx int) int {
-	return (idx + 1) & (len(m.data) - 1)
+	return nextIndex(idx, len(m.data))
 }
 
 func forEach64[K IntKey, V any](pairs []pair[K, V], f func(k K, v V) bool) {
@@ -446,4 +447,12 @@ func arraySize(exp int, fill float64) int {
 		s = 2
 	}
 	return int(s)
+}
+
+func startIndex(key, len int) int {
+	return phiMix64(key) & (len - 1)
+}
+
+func nextIndex(idx, len int) int {
+	return (idx + 1) & (len - 1)
 }
